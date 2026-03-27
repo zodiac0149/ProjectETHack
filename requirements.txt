@@ -1,0 +1,7 @@
+beautifulsoup4
+httpx
+lxml
+markdownify
+python-dotenv
+pydantic
+tqdm
