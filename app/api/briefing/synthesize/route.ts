@@ -9,11 +9,8 @@ type BriefingSection = {
   id: string;
   title: string;
   summary: string;
-  classify: string;
-  affect: string;
-  benefit: string;
   personal?: string;
-  keyPoints: string[];
+  points: string[];
   sourceAtomIds: string[];
 };
 
@@ -24,12 +21,9 @@ type BriefingDoc = {
   sections: BriefingSection[];
 };
 
-function synthPrompt(query: string, atoms: RoutedAtom[], workProfile: string = ""): string {
+export function synthPrompt(query: string, atoms: RoutedAtom[], userPersona: string): string {
   const atomBlock = atoms
     .map((a, i) => {
-      const ents = a.tags?.entities?.slice(0, 6) ?? [];
-      const sector = a.tags?.sector ?? "Other";
-      const sentiment = a.tags?.sentiment ?? "Neutral";
       return [
         `ATOM ${i + 1}`,
         `id: ${a.atom_id}`,
@@ -39,45 +33,56 @@ function synthPrompt(query: string, atoms: RoutedAtom[], workProfile: string = "
     })
     .join("\n\n---\n\n");
 
-  const personalSection = workProfile 
-    ? `    - "personal": string (How this affects a ${workProfile} specifically)`
-    : "";
-
   return [
-    "You are a professional news analyst. Create a highly structured DEEP DIVE briefing.",
+    `You are an elite intelligence analyst producing a highly tailored briefing.`,
+    `CRITICAL: The entire briefing must be fundamentally shaped ONLY by the user's persona and their specific interests.`,
     "",
     "USER CONTEXT:",
-    `Role: ${workProfile || "General Reader"}`,
-    `Query: ${query}`,
+    `Persona / Role: ${userPersona || "General Reader"}`,
+    `Query / Topic: ${query}`,
     "",
     "SOURCE NEWS ATOMS:",
     atomBlock,
     "",
     "TASK:",
-    "Divide the news into 5-8 distinct sections. Each section MUST follow this JSON structure:",
-    "{",
-    '  "title": string (Actionable title),',
-    '  "summary": string (A cohesive, 3-4 sentence professional summary of this section, suitable for reading aloud),',
-    '  "classify": string (What exactly is this? Categorize it clearly),',
-    '  "affect": string (Who or what does this directly impact? Market, Sector, etc),',
-    '  "benefit": string (Who wins and how? Specify advantages),',
-    workProfile ? '  "personal": string (Explain the direct impact on a ' + workProfile + "'s work life)," : "",
-    '  "keyPoints": string[]',
-    "}",
+    `Select ONLY the facts from the atoms that are directly relevant to a '${userPersona || "General Reader"}'. Discard everything else.`,
+    "Synthesise this filtered relevant data into a single cohesive briefing separated into 3-5 distinct 'Angles of Interest'.",
+    "Name these Angles specifically based on what this precise persona cares about.",
+    "If an Angle contains strong comparative data (like percentage distributions, market share, or allocations), build a 'chart' object.",
+    "",
+    "CONSOLIDATION RULES:",
+    `- EXTREME PERSONA FOCUS: If the user indicates a focus (e.g., 'macro policy' or 'tech sector'), ONLY include data about that focus. If an atom discusses unrelated topics, IGNORE them.`,
+    "- NO CONTENT DUPLICATION: Each explicit angle MUST address distinct facts. A flat summary or simple aggregation scores low. The test is whether distinct user questions get distinct, non-overlapping answers.",
+    "- PERSONALISED FEED: Adapt depth, vocabulary, and actionable framing directly to the user role. (e.g., a CFO gets macro figures and policy timelines; a young retail investor gets direct stock/momentum advice in relatable language).",
+    "- MERGE REDUNDANCY: If multiple news atoms lead to the same insight within an angle, merge them. Do not repeat facts across sections.",
+    "- BE CONCISE: Minimal words, maximum signal.",
     "",
     "OUTPUT FORMAT:",
     "Return ONLY valid JSON matching this schema:",
     "{",
-    '  "title": string,',
-    '  "query": string,',
-    '  "generatedAt": string,',
-    '  "sections": [...]',
+    '  "title": "Overall Briefing Title",',
+    '  "query": "The user query",',
+    '  "generatedAt": "ISO date string",',
+    '  "personal": "A single, powerful, global inference summarizing what this entire briefing means specifically for the user / ' + (userPersona || "General Reader") + '",',
+    '  "actionPlan": {',
+    '    "impact": "Deep insight into exactly what affects the user from the news.",',
+    '    "preparation": ["How the user should strictly prepare", "Tactical action step"]',
+    '  },',
+    '  "sections": [',
+    '    {',
+    '      "title": "Angle Name",',
+    '      "summary": "High-impact angle summary",',
+    '      "points": ["Point 1", "Point 2", "Point 3"],',
+    '      "chart": {',
+    '        "title": "Chart Title (e.g., Budget Allocation)",',
+    '        "data": [',
+    '          { "label": "Tech Sector", "value": 45, "unit": "%" },',
+    '          { "label": "Other", "value": 55, "unit": "%" }',
+    '        ]',
+    '      }',
+    '    }',
+    '  ]',
     "}",
-    "",
-    "RULES:",
-    "- No overlap between sections.",
-    "- Be factual and concise.",
-    "- If no personal benefit/harm exists for the profile, be honest but find any relevance.",
   ].join("\n");
 }
 
@@ -113,7 +118,7 @@ async function criticCheck(args: {
     '{ "pass": boolean, "issues": string[], "unsupported_claims": string[] }',
     "",
     "CRITICAL RULES:",
-    "- 'classify', 'affect', 'benefit' and 'keyPoints' MUST be strictly supported by the SOURCE ATOMS.",
+    "- 'points' MUST be strictly supported by the SOURCE ATOMS.",
     "- Atoms starting with 'remote-' are from real-time web search. They are shorter snippets; allow for reasonable logical synthesis from them.",
     "- 'personal' impact sections are LOGICAL INFERENCES. Do not flag them as hallucinations unless they contradict the source atoms or are totally unrelated.",
     "- If a core news fact (e.g. market share, price, name) is not in the atoms, pass=false.",
@@ -136,12 +141,12 @@ export async function POST(req: Request) {
     query?: string;
     topK?: number;
     userId?: string;
-    workProfile?: string;
+    userPersona?: string;
   };
   const query = (body.query || "").toString().trim();
   const topK = Number.isFinite(body.topK) ? Number(body.topK) : 28;
   const userId = (body.userId || "").toString().trim() || null;
-  const workProfile = (body.workProfile || "").toString().trim();
+  const userPersona = (body.userPersona || "").toString().trim();
 
   if (!query) {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
@@ -189,11 +194,8 @@ export async function POST(req: Request) {
         id: "no-results",
         title: "No Matching Intelligence",
         summary: "I searched your local library and the web for this topic but couldn't find any relevant news articles to analyze.",
-        classify: "Notice",
-        affect: "Search Quality",
-        benefit: "None",
         personal: "No actionable data found for this specific query.",
-        keyPoints: [
+        points: [
           "No local atoms matched the relevance threshold.",
           "Web search returned no high-confidence news results.",
           "Try a different query or add a URL to the library."
@@ -207,8 +209,8 @@ export async function POST(req: Request) {
   let doc: BriefingDoc | unknown;
   try {
     const prefs = userId ? await getPersonaAdjustments(userId) : "";
-    const prompt = [prefs, synthPrompt(query, routed, workProfile)].filter(Boolean).join("\n\n");
-    const system = "You are a professional news analyst providing personalized briefings.";
+    const prompt = [prefs, synthPrompt(query, routed, userPersona)].filter(Boolean).join("\n\n");
+    const system = "You are a professional news analyst providing highly personalized, multi-angle briefings.";
 
     doc = await generateJSON<BriefingDoc>({
       system,
@@ -249,7 +251,7 @@ export async function POST(req: Request) {
       id: s.id && s.id !== "undefined"
         ? s.id
         : `sec-${i}-${(s.title || "section").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`,
-      keyPoints: Array.isArray(s.keyPoints) ? s.keyPoints : [],
+      points: Array.isArray(s.points) ? s.points : [],
       sourceAtomIds: Array.isArray(s.sourceAtomIds) ? s.sourceAtomIds : [],
     })),
   };

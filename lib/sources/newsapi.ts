@@ -26,7 +26,7 @@ export async function searchNewsApi(query: string, pageSize = 10): Promise<NewsA
       sortBy: "publishedAt",
     }).toString();
 
-  const res = await fetch(url, { headers: { "X-Api-Key": key } });
+  const res = await fetch(url, { headers: { "X-Api-Key": key, "User-Agent": "NewsNavigator/1.0" } });
   if (!res.ok) throw new Error(await res.text());
   const data = (await res.json()) as { articles?: any[] };
   const arts = Array.isArray(data.articles) ? data.articles : [];

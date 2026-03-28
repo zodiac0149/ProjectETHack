@@ -93,11 +93,11 @@ html, body {
   align-items: center;
   gap: 12px;
   padding: 0 20px;
-  background: var(--sidebar-bg);
+  background: #0f1623;
   border-bottom: 1px solid var(--sidebar-border);
   position: sticky;
   top: 0;
-  z-index: 200;
+  z-index: 500;
 }
 
 .brand-wrap {
@@ -222,6 +222,20 @@ html, body {
 .sb-input::placeholder { color: rgba(200,212,240,0.25); }
 .sb-select option { background: #1a2238; }
 
+.pill-preset {
+  background: rgba(99,150,255,0.1);
+  border: 1px solid rgba(99,150,255,0.25);
+  border-radius: 12px;
+  color: #a5c0ff;
+  font-size: 10px; font-weight: 600;
+  padding: 4px 10px; cursor: pointer;
+  transition: all 0.2s;
+}
+.pill-preset:hover {
+  background: rgba(99,150,255,0.25);
+  color: #fff;
+}
+
 .btn-generate {
   width: 100%;
   padding: 11px 16px;
@@ -299,12 +313,13 @@ html, body {
 
 /* ─── Page Header Bar ─── */
 .page-header {
-  background: #fff;
+  background: #ffffff;
   border-bottom: 1px solid var(--card-border);
   padding: 16px 28px;
   display: flex; align-items: center; justify-content: space-between;
   gap: 16px; flex-wrap: wrap;
-  position: sticky; top: 56px; z-index: 100;
+  position: sticky; top: 0; z-index: 400;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 .page-title { font-size: 17px; font-weight: 800; color: var(--text-primary); line-height: 1.2; }
@@ -684,7 +699,92 @@ html, body {
 .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
 /* ═══════════════════════════════════════════════════════
-   OUTPUT LAYER MODES
+   CAREER INTELLIGENCE (POINT-BASED)
+   ═══════════════════════════════════════════════════════ */
+.career-intelligence-pod {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.career-category-section {
+  padding-left: 12px;
+  position: relative;
+}
+
+.career-category-section::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 4px; bottom: 4px;
+  width: 4px;
+  border-radius: 999px;
+}
+
+.cp-jobs::before { background: var(--blue); }
+.cp-prof::before { background: var(--purple); }
+.cp-edu::before { background: var(--green); }
+.cp-personal::before { background: var(--amber); }
+
+.career-category-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.career-cat-icon {
+  font-size: 20px;
+}
+
+.career-cat-label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.career-point-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.career-point-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: white;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.career-point-item:hover {
+  border-color: #cbd5e1;
+  transform: translateX(4px);
+  background: #fbfcfe;
+}
+
+.career-point-bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  flex-shrink: 0;
+  margin-top: 7px;
+}
+
+.career-point-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════
+   OUTPUT LAYER MODES (LEGACY/BACKUP)
    ═══════════════════════════════════════════════════════ */
 
 /* GRID 2×2 */

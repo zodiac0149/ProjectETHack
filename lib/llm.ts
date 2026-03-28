@@ -61,10 +61,11 @@ export async function generateJSON<T>(args: {
     }
 
     if (provider === "groq" && process.env.GROQ_API_KEY) {
-      const models = [
-        process.env.GROQ_MODEL || "llama-3.1-8b-instant",
-        process.env.GROQ_MODEL_FALLBACK || "llama3-8b-8192"
-      ];
+      const models: string[] = [];
+      if (process.env.GROQ_MODEL && process.env.GROQ_MODEL !== "llama3-8b-8192") models.push(process.env.GROQ_MODEL);
+      if (process.env.GROQ_MODEL_FALLBACK && process.env.GROQ_MODEL_FALLBACK !== "llama3-8b-8192") models.push(process.env.GROQ_MODEL_FALLBACK);
+      if (models.length === 0) models.push("llama-3.3-70b-versatile", "llama-3.1-8b-instant");
+
       for (const model of models) {
         try {
           const apiKey = process.env.GROQ_API_KEY;
@@ -157,10 +158,11 @@ export async function generateText(args: {
     }
 
     if (provider === "groq" && process.env.GROQ_API_KEY) {
-      const models = [
-        process.env.GROQ_MODEL || "llama-3.1-8b-instant",
-        process.env.GROQ_MODEL_FALLBACK || "llama3-8b-8192"
-      ];
+      const models: string[] = [];
+      if (process.env.GROQ_MODEL && process.env.GROQ_MODEL !== "llama3-8b-8192") models.push(process.env.GROQ_MODEL);
+      if (process.env.GROQ_MODEL_FALLBACK && process.env.GROQ_MODEL_FALLBACK !== "llama3-8b-8192") models.push(process.env.GROQ_MODEL_FALLBACK);
+      if (models.length === 0) models.push("llama-3.3-70b-versatile", "llama-3.1-8b-instant");
+
       for (const model of models) {
         try {
           const apiKey = process.env.GROQ_API_KEY;

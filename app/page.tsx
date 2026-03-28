@@ -3,21 +3,22 @@
 import { useMemo, useState, useCallback } from "react";
 
 // ── Types ─────────────────────────────────────────────────────
+type ChartData = { title: string; data: { label: string; value: number; unit?: string }[]; };
+type ActionPlan = { impact: string; preparation: string[]; };
 type BriefingSection = {
   id: string;
   title: string;
   summary: string;
-  classify: string;
-  affect: string;
-  benefit: string;
-  personal?: string;
-  keyPoints: string[];
+  points: string[];
+  chart?: ChartData;
   sourceAtomIds: string[];
 };
 type BriefingDoc = {
   title: string;
   query: string;
   generatedAt: string;
+  personal?: string;
+  actionPlan?: ActionPlan;
   sections: BriefingSection[];
 };
 type ArcPoint = { id: string; title: string; sentiment: number; label: string; emoji: string; summary: string; };
@@ -36,7 +37,7 @@ function normalizeBriefing(raw: BriefingDoc): BriefingDoc {
       id: s.id && s.id !== "undefined" && s.id.trim()
         ? s.id
         : `sec-${i}-${(s.title || "section").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`,
-      keyPoints: Array.isArray(s.keyPoints) ? s.keyPoints : [],
+      points: Array.isArray((s as any).points) ? (s as any).points : (Array.isArray((s as any).keyPoints) ? (s as any).keyPoints : []),
       sourceAtomIds: Array.isArray(s.sourceAtomIds) ? s.sourceAtomIds : [],
     })),
   };
@@ -60,7 +61,7 @@ function sentimentPct(s: number) { return `${((s + 2) / 4) * 100}%`; }
 // ── Component ──────────────────────────────────────────────────
 export default function HomePage() {
   // Setup state
-  const [workProfile, setWorkProfile] = useState("");
+  const [userPersona, setUserPersona] = useState("");
   const [query, setQuery] = useState("");
   const [articleUrl, setArticleUrl] = useState("");
   const [language, setLanguage] = useState<Language>("en");
@@ -78,6 +79,7 @@ export default function HomePage() {
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [arcLoading, setArcLoading] = useState(false);
   const [translatingId, setTranslatingId] = useState<string | null>(null);
+  const [isTranslatingAll, setIsTranslatingAll] = useState(false);
 
   // Errors & messages
   const [error, setError] = useState<string | null>(null);
@@ -97,17 +99,35 @@ export default function HomePage() {
     [doc, activeSectionId]
   );
 
-  const getField = useCallback((section: BriefingSection, key: "summary" | "classify" | "affect" | "benefit" | "personal") => {
+  const getField = useCallback((section: BriefingSection, key: "summary") => {
     const raw = section[key] || "";
     if (language === "en") return raw;
     return translateCache[`${language}:${section.id}:${key}`] || raw;
   }, [language, translateCache]);
 
+  const getDocPersonal = useCallback(() => {
+    const raw = doc?.personal || "";
+    if (language === "en") return raw;
+    return translateCache[`${language}:doc:personal`] || raw;
+  }, [language, translateCache, doc]);
+
+  const getActionPlanImpact = useCallback(() => {
+    const raw = doc?.actionPlan?.impact || "";
+    if (language === "en") return raw;
+    return translateCache[`${language}:doc:actionPlan:impact`] || raw;
+  }, [language, translateCache, doc]);
+
+  const getActionPlanPrep = useCallback((idx: number) => {
+    const raw = doc?.actionPlan?.preparation?.[idx] || "";
+    if (language === "en") return raw;
+    return translateCache[`${language}:doc:actionPlan:prep:${idx}`] || raw;
+  }, [language, translateCache, doc]);
+
   const translateSection = useCallback(async (section: BriefingSection) => {
     if (language === "en") return;
     setTranslatingId(section.id);
     try {
-      for (const key of ["summary", "classify", "affect", "benefit", "personal"] as const) {
+      for (const key of ["summary"] as const) {
         const text = section[key];
         if (!text) continue;
         const cacheKey = `${language}:${section.id}:${key}`;
@@ -115,9 +135,50 @@ export default function HomePage() {
         const res = await postJSON<{ translated: string }>("/api/translate", { text, targetLanguage: language });
         setTranslateCache(prev => ({ ...prev, [cacheKey]: res.translated }));
       }
+      
+      // Translate array of points
+      if (section.points && Array.isArray(section.points)) {
+        for (let i = 0; i < section.points.length; i++) {
+          const pt = section.points[i];
+          const cacheKey = `${language}:${section.id}:point:${i}`;
+          if (!pt || translateCache[cacheKey]) continue;
+          const res = await postJSON<{ translated: string }>("/api/translate", { text: pt, targetLanguage: language });
+          setTranslateCache(prev => ({ ...prev, [cacheKey]: res.translated }));
+        }
+      }
     } catch { /* silent */ }
     finally { setTranslatingId(null); }
   }, [language, translateCache]);
+
+  const translateDocument = useCallback(async () => {
+    if (!doc || language === "en") return;
+    setIsTranslatingAll(true);
+    try {
+      const promises: Promise<void>[] = [];
+      const translateToCache = async (text: string, cacheKey: string) => {
+        if (!text || translateCache[cacheKey] || typeof text !== "string") return;
+        try {
+          const res = await postJSON<{ translated: string }>("/api/translate", { text, targetLanguage: language });
+          setTranslateCache(prev => ({ ...prev, [cacheKey]: res.translated }));
+        } catch {}
+      };
+
+      if (doc.personal) promises.push(translateToCache(doc.personal, `${language}:doc:personal`));
+      if (doc.actionPlan?.impact) promises.push(translateToCache(doc.actionPlan.impact, `${language}:doc:actionPlan:impact`));
+      
+      if (doc.actionPlan?.preparation) {
+        doc.actionPlan.preparation.forEach((step, i) => {
+          promises.push(translateToCache(step, `${language}:doc:actionPlan:prep:${i}`));
+        });
+      }
+
+      await Promise.all(promises);
+      await Promise.all(doc.sections.map(s => translateSection(s)));
+      
+    } finally {
+      setIsTranslatingAll(false);
+    }
+  }, [doc, language, translateCache, translateSection]);
 
   const translateArc = useCallback(async (arcData: StoryArc) => {
     if (language === "en") return;
@@ -154,7 +215,7 @@ export default function HomePage() {
       const resp = await fetch("/api/briefing/synthesize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, workProfile, topK: 28 }),
+        body: JSON.stringify({ query, userPersona, topK: 28 }),
       });
       const data = await resp.json();
       if (!resp.ok) {
@@ -222,9 +283,9 @@ export default function HomePage() {
     if (!followUpQ.trim() || !activeSection) return;
     setFollowUpLoading(true); setFollowUpAnswer(null);
     try {
-      const context = [activeSection.classify, activeSection.affect, activeSection.benefit, activeSection.personal, ...(activeSection.keyPoints || [])].filter(Boolean).join(". ");
+      const context = [activeSection.summary, ...(activeSection.points || [])].filter(Boolean).join(". ");
       const res = await postJSON<{ answer: string }>("/api/briefing/followup", {
-        question: followUpQ, sectionTitle: activeSection.title, sectionContext: context, workProfile,
+        question: followUpQ, sectionTitle: activeSection.title, sectionContext: context, userPersona,
       });
       setFollowUpAnswer(res.answer);
     } catch (e) { setFollowUpAnswer(`Error: ${e instanceof Error ? e.message : String(e)}`); }
@@ -236,7 +297,7 @@ export default function HomePage() {
     setArcLoading(true);
     try {
       const res = await postJSON<StoryArc>("/api/story-arc", {
-        sections: doc.sections.map(s => ({ id: s.id, title: s.title, classify: s.classify, affect: s.affect, benefit: s.benefit, personal: s.personal })),
+        sections: doc.sections.map(s => ({ id: s.id, title: s.title, summary: s.summary })),
       });
       setArc(res); setActivePane("arc");
       if (language !== "en") translateArc(res);
@@ -244,93 +305,50 @@ export default function HomePage() {
     finally { setArcLoading(false); }
   }
 
-  function handleSectionClick(section: BriefingSection) {
-    setActiveSectionId(section.id);
+  function scrollToSection(id: string) {
+    const el = document.getElementById(`doc-sec-${id}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setActiveSectionId(id);
     setFollowUpAnswer(null); setFollowUpQ("");
-    if (language !== "en") translateSection(section);
+    const section = doc?.sections.find(s => s.id === id);
+    if (section && language !== "en") translateSection(section);
   }
 
   // ── Render helpers ────────────────────────────────────────
-  function renderGrid(s: BriefingSection) {
+  function renderChart(chart?: ChartData) {
+    if (!chart || !chart.data || chart.data.length === 0) return null;
+    const maxVal = Math.max(...chart.data.map(d => d.value));
     return (
-      <div className="output-grid">
-        <div className="layer-box lb-classify">
-          <span className="lbox-icon">🔍</span>
-          <span className="lbox-label">Classify — What is this?</span>
-          <p className="lbox-text">{getField(s, "classify")}</p>
-        </div>
-        <div className="layer-box lb-affect">
-          <span className="lbox-icon">📊</span>
-          <span className="lbox-label">Affect — Who is impacted?</span>
-          <p className="lbox-text">{getField(s, "affect")}</p>
-        </div>
-        <div className="layer-box lb-benefit">
-          <span className="lbox-icon">🚀</span>
-          <span className="lbox-label">Benefit — Who wins & how?</span>
-          <p className="lbox-text">{getField(s, "benefit")}</p>
-        </div>
-        <div className="layer-box lb-personal">
-          <span className="lbox-icon">👤</span>
-          <span className="lbox-label">For {workProfile || "You"}</span>
-          <p className="lbox-text">{getField(s, "personal") || "Analyzing relevance to your profile…"}</p>
-        </div>
-      </div>
-    );
-  }
-
-  function renderLayers(s: BriefingSection) {
-    const layers = [
-      { cls: "ls-classify", icon: "🔍", label: "Classify — What is this?", text: getField(s, "classify") },
-      { cls: "ls-affect",   icon: "📊", label: "Affect — Who is impacted?", text: getField(s, "affect") },
-      { cls: "ls-benefit",  icon: "🚀", label: "Benefit — Who wins?",       text: getField(s, "benefit") },
-      { cls: "ls-personal", icon: "👤", label: `For ${workProfile || "You"}`, text: getField(s, "personal") || "Analyzing relevance to your profile…" },
-    ];
-    return (
-      <div className="output-layers">
-        {layers.map(l => (
-          <div key={l.cls} className={`layer-strip ${l.cls}`}>
-            <div className="layer-strip-tab" />
-            <div className="layer-strip-icon">{l.icon}</div>
-            <div className="layer-strip-body">
-              <div className="layer-strip-label">{l.label}</div>
-              <div className="layer-strip-text">{l.text}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  function renderFacts(s: BriefingSection) {
-    // Key facts mode: all analysis + key points as chips
-    const factLines = [
-      { bullet: "🔍", label: "Classify", text: getField(s, "classify") },
-      { bullet: "📊", label: "Affect",   text: getField(s, "affect") },
-      { bullet: "🚀", label: "Benefit",  text: getField(s, "benefit") },
-      { bullet: "👤", label: `For You`,  text: getField(s, "personal") || "" },
-    ].filter(f => f.text);
-
-    return (
-      <div className="facts-module">
-        <div className="facts-header">
-          <span style={{ fontSize: "16px" }}>💡</span>
-          <span className="facts-header-title">Key Intelligence Summary</span>
-          <span className="facts-count">{s.keyPoints.length + factLines.length} facts</span>
-        </div>
-        <div className="facts-grid">
-          {factLines.map((f, i) => (
-            <div key={i} className="fact-chip">
-              <div style={{ fontSize: "14px", flexShrink: 0 }}>{f.bullet}</div>
-              <div>
-                <div style={{ fontSize: "9px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6b7280", marginBottom: "2px" }}>{f.label}</div>
-                <div className="fact-text">{f.text}</div>
+      <div className="v-chart-wrap" style={{ marginTop: "16px", marginBottom: "16px", padding: "16px", background: "linear-gradient(to bottom right, #f8fafc, #f1f5f9)", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+        <h4 style={{ fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "16px", letterSpacing: "0.08em", textTransform: "uppercase" }}>📊 {chart.title}</h4>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {chart.data.map((d, i) => {
+            const pct = maxVal > 0 ? (d.value / maxVal) * 100 : 0;
+            return (
+              <div key={i} className="v-chart-row" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ width: "95px", fontSize: "12px", color: "#64748b", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={d.label}>{d.label}</div>
+                <div style={{ flex: 1, height: "12px", background: "#e2e8f0", borderRadius: "6px", overflow: "hidden" }}>
+                  <div className="v-chart-bar" style={{ width: `${pct}%`, height: "100%", background: "linear-gradient(90deg, #3b82f6, #2dd4bf)", borderRadius: "6px", transition: "width 0.8s ease-out" }} />
+                </div>
+                <div style={{ width: "45px", fontSize: "12px", color: "#0f172a", fontWeight: 800, textAlign: "right" }}>{d.value}{d.unit || ""}</div>
               </div>
-            </div>
-          ))}
-          {s.keyPoints.map((kp, i) => (
-            <div key={`kp-${i}`} className="fact-chip">
-              <div className="fact-bullet" style={{ marginTop: "6px" }} />
-              <div className="fact-text">{kp}</div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function renderCareerPoints(s: BriefingSection) {
+    return (
+      <div className="career-intelligence-pod">
+        <div className="career-point-list">
+          {(s.points || []).map((point, idx) => (
+            <div key={idx} className="career-point-item">
+              <div className="career-point-bullet" />
+              <div className="career-point-text">
+                {language === "en" ? point.replace(/^[-*•\s]+/, "") : (translateCache[`${language}:${s.id}:point:${idx}`] || point).replace(/^[-*•\s]+/, "")}
+              </div>
             </div>
           ))}
         </div>
@@ -371,6 +389,11 @@ export default function HomePage() {
               <option key={l} value={l}>{LANG_LABELS[l]}</option>
             ))}
           </select>
+          {doc && language !== "en" && (
+            <button className="tb-btn" onClick={translateDocument} disabled={isTranslatingAll}>
+              {isTranslatingAll ? "Translating..." : "OK"}
+            </button>
+          )}
 
           {doc && (
             <button className={`tb-btn ${activePane === "arc" ? "active" : ""}`} onClick={() => {
@@ -394,8 +417,12 @@ export default function HomePage() {
         <div className="sidebar-section" style={{ paddingTop: "20px" }}>
           <div className="sidebar-label">Your Profile</div>
           <div className="sb-field">
-            <label>Work Role</label>
-            <input className="sb-input" value={workProfile} onChange={e => setWorkProfile(e.target.value)} placeholder="e.g. Tax Lawyer, Startup Founder" />
+            <label>User Persona</label>
+            <input className="sb-input" value={userPersona} onChange={e => setUserPersona(e.target.value)} placeholder="e.g. 45-year-old CFO" />
+            <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+              <button className="pill-preset" onClick={() => setUserPersona("45-year-old CFO tracking macro policy")}>45yo CFO</button>
+              <button className="pill-preset" onClick={() => setUserPersona("24-year-old first-generation investor")}>24yo Investor</button>
+            </div>
           </div>
           <div className="sb-field" style={{ marginBottom: "14px" }}>
             <label>Intelligence Query</label>
@@ -430,7 +457,7 @@ export default function HomePage() {
             <div className="sidebar-label">Sections</div>
             <div className="sb-section-list">
               {doc.sections.map((s, i) => (
-                <button key={s.id} className={`sb-sec-btn ${activeSectionId === s.id ? "active" : ""}`} onClick={() => handleSectionClick(s)} id={`sec-${s.id}`}>
+                <button key={s.id} className={`sb-sec-btn ${activeSectionId === s.id ? "active" : ""}`} onClick={() => scrollToSection(s.id)} id={`sec-${s.id}`}>
                   <span className="sb-sec-num">{i + 1}</span>
                   <span style={{ lineHeight: "1.4" }}>
                     {s.title}
@@ -481,30 +508,23 @@ export default function HomePage() {
           </div>
         )}
 
-        {doc && activePane === "briefing" && activeSection && (
+        {doc && activePane === "briefing" && (
           <div className="page-header">
             <div>
-              <div className="page-title">{activeSection.title}</div>
-              <div className="page-subtitle">{doc.title} · {new Date(doc.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+              <div className="page-title">{doc.title}</div>
+              <div className="page-subtitle">Unified Briefing · {new Date(doc.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
             </div>
             <div className="header-actions">
-              {/* View mode */}
-              <div className="view-tabs">
-                <button className={`view-tab ${viewMode === "grid" ? "active" : ""}`} onClick={() => setViewMode("grid")}>⊞ Grid</button>
-                <button className={`view-tab ${viewMode === "layers" ? "active" : ""}`} onClick={() => setViewMode("layers")}>≡ Layers</button>
-                <button className={`view-tab ${viewMode === "facts" ? "active" : ""}`} onClick={() => setViewMode("facts")}>💡 Key Facts</button>
-              </div>
+
               {/* Audio */}
               <button
                 className="btn btn-green btn-sm"
-                disabled={audioLoading === activeSection.id}
-                id={`audio-${activeSection.id}`}
-                onClick={() => playAudio(
-                  getField(activeSection, "summary") || `${getField(activeSection, "classify")}. ${getField(activeSection, "affect")}. ${getField(activeSection, "benefit")}.`,
-                  activeSection.id
-                )}
+                onClick={() => {
+                   const fullText = doc.sections.map(s => getField(s, "summary") + " " + (s.points || []).join(". ")).join(" ");
+                   playAudio(fullText, "full-doc");
+                }}
               >
-                {audioLoading === activeSection.id ? <><span className="spin" /> Loading…</> : "🔊 Read Aloud"}
+                {audioLoading === "full-doc" ? <><span className="spin" /> Loading…</> : "🔊 Read Full Briefing"}
               </button>
             </div>
           </div>
@@ -552,56 +572,92 @@ export default function HomePage() {
 
           {/* ── BRIEFING PANE ── */}
           {doc && !loading && activePane === "briefing" && (
-            <div className="anim-in">
-              {activeSection ? (
-                <>
-                  {/* Executive Summary */}
-                  {activeSection.summary && (
+            <div className="anim-in document-container">
+              {doc.sections.map((section, secIdx) => (
+                <div key={section.id} id={`doc-sec-${section.id}`} className="doc-section" style={{ marginBottom: "40px", paddingBottom: "32px", borderBottom: secIdx < doc.sections.length - 1 ? "1px solid #e5e7eb" : "none" }}>
+                  <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#111827", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ color: "#3b82f6", opacity: 0.8 }}>#</span> {section.title}
+                  </h2>
+                  
+                  {/* Executive Summary for this Angle */}
+                  {section.summary && (
                     <div className="card card-pad" style={{ marginBottom: "20px", borderLeft: "4px solid #3b82f6", background: "#f8faff" }}>
-                      <div style={{ fontSize: "10px", fontWeight: 800, color: "#3b82f6", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>📋 Executive Summary</div>
+                      <div style={{ fontSize: "10px", fontWeight: 800, color: "#3b82f6", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>📋 Angle Summary</div>
                       <div style={{ fontSize: "15px", lineHeight: "1.6", color: "#1e293b", fontWeight: 500 }}>
-                        {getField(activeSection, "summary")}
+                        {getField(section, "summary")}
                       </div>
                     </div>
                   )}
 
-                  {/* Analysis Output — view mode dependent */}
-                  {viewMode === "grid"   && renderGrid(activeSection)}
-                  {viewMode === "layers" && renderLayers(activeSection)}
-                  {viewMode === "facts"  && renderFacts(activeSection)}
+                  {/* Native CSS Chart Visualization */}
+                  {renderChart(section.chart)}
 
-                  {/* Key points (grid + layers modes) */}
-                  {viewMode !== "facts" && activeSection.keyPoints.length > 0 && (
-                    <div className="card card-pad" style={{ marginBottom: "16px" }}>
-                      <div className="card-header" style={{ marginBottom: "12px" }}>
-                        <span className="card-title">💡 Key Details</span>
-                        <span className="badge badge-blue">{activeSection.keyPoints.length} points</span>
-                      </div>
-                      <div className="facts-grid">
-                        {activeSection.keyPoints.map((kp, i) => (
-                          <div key={i} className="fact-chip">
-                            <div className="fact-bullet" style={{ marginTop: "6px" }} />
-                            <div className="fact-text">{kp}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Analysis Output points */}
+                  {renderCareerPoints(section)}
+                </div>
+              ))}
 
-                  {/* Follow-up Q&A */}
-                  <div className="followup-module">
-                    <div className="followup-header">
-                      <span>💬</span> Ask a Follow-up Question
-                    </div>
-                    <div className="followup-row">
-                      <input
-                        className="followup-input"
-                        value={followUpQ}
-                        onChange={e => setFollowUpQ(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && askFollowUp()}
-                        placeholder={`Ask anything about "${activeSection.title}"…`}
-                        id="followup-input"
-                      />
+              {/* Global Synthesis & Action Plan */}
+              {(doc.personal || doc.actionPlan) && (
+                <div className="global-personal-box" style={{ background: "linear-gradient(135deg, #fffbeb, #fef3c7)", border: "1px solid #fde68a", padding: "24px", borderRadius: "12px", marginBottom: "40px", boxShadow: "0 4px 20px rgba(217, 119, 6, 0.08)" }}>
+                   <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+                     <span style={{ fontSize: "24px" }}>🎯</span>
+                     <h3 style={{ fontSize: "15px", fontWeight: 800, color: "#92400e", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>Executive Conclusion for {userPersona || "You"}</h3>
+                   </div>
+                   {doc.personal && (
+                     <div style={{ fontSize: "16px", lineHeight: "1.7", color: "#78350f", fontWeight: 500, fontStyle: "italic", marginBottom: doc.actionPlan ? "20px" : "0" }}>
+                       {getDocPersonal()}
+                     </div>
+                   )}
+                   
+                   {doc.actionPlan && (
+                     <div style={{ marginTop: "16px", padding: "24px", background: "#fff", borderRadius: "8px", border: "1px solid #fcd34d", boxShadow: "0 2px 10px rgba(217, 119, 6, 0.03)" }}>
+                       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
+                         <span style={{ fontSize: "18px" }}>⚡</span>
+                         <h4 style={{ fontSize: "14px", fontWeight: 800, color: "#92400e", letterSpacing: "0.05em", textTransform: "uppercase", margin: 0 }}>Strategic Action Plan</h4>
+                       </div>
+                       
+                       {/* Impact Analysis */}
+                       {doc.actionPlan.impact && (
+                         <div style={{ marginBottom: "20px" }}>
+                           <div style={{ fontSize: "11px", fontWeight: 800, color: "#b45309", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>How This Affects You</div>
+                           <div style={{ fontSize: "15px", color: "#78350f", lineHeight: "1.6", fontWeight: 500 }}>{getActionPlanImpact()}</div>
+                         </div>
+                       )}
+
+                       {/* Preparation Steps */}
+                       {doc.actionPlan.preparation && doc.actionPlan.preparation.length > 0 && (
+                         <div>
+                           <div style={{ fontSize: "11px", fontWeight: 800, color: "#b45309", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "8px" }}>How To Prepare & Act</div>
+                           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                             {doc.actionPlan.preparation.map((step, i) => (
+                               <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", background: "#fefce8", padding: "10px 14px", borderRadius: "6px", border: "1px solid #fef08a" }}>
+                                 <div style={{ color: "#d97706", marginTop: "1px", fontSize: "16px" }}>✓</div>
+                                 <div style={{ fontSize: "14.5px", color: "#92400e", fontWeight: 600, lineHeight: "1.5" }}>{getActionPlanPrep(i)}</div>
+                               </div>
+                             ))}
+                           </div>
+                         </div>
+                       )}
+                     </div>
+                   )}
+                </div>
+              )}
+
+              {/* Follow-up Q&A at the bottom of the document */}
+              <div className="followup-module" style={{ marginTop: "24px" }}>
+                <div className="followup-header">
+                  <span>💬</span> Ask a Follow-up Question about this Briefing
+                </div>
+                <div className="followup-row">
+                  <input
+                    className="followup-input"
+                    value={followUpQ}
+                    onChange={e => setFollowUpQ(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && askFollowUp()}
+                    placeholder={`Ask anything about "${doc.title}"…`}
+                    id="followup-input"
+                  />
                       {followUpQ && (
                         <button onClick={() => setFollowUpQ("")} title="Clear" style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "16px", padding: "0 4px", lineHeight: 1 }}>✕</button>
                       )}
@@ -623,14 +679,7 @@ export default function HomePage() {
                         {followUpAnswer}
                       </div>
                     )}
-                  </div>
-                </>
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-icon" style={{ fontSize: "40px" }}>👈</div>
-                  <p className="empty-sub">Select a section from the sidebar to begin your deep-dive.</p>
-                </div>
-              )}
+              </div>
             </div>
           )}
 
