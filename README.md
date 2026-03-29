@@ -462,13 +462,3 @@ Response:
 6. ✅ Test search functionality
 7. ✅ Deploy to Vercel or production
 
----
-
-## 📝 License
-
-MIT License - See LICENSE file
-
----
-
-*Created for Project Submission 2026 - Optimized for High-Availability and Demo-Readiness.*
-*Powered by Next.js, Groq LLMs, and Real-Time News APIs*
