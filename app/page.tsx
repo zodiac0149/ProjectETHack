@@ -138,8 +138,9 @@ export default function HomePage() {
           setTranslateCache(prev => ({ ...prev, [cacheKey]: res.translated }));
         }
       }
-    } catch 
-    finally { setTranslatingId(null); }
+    } catch (e) {
+      console.error("Translation error", e);
+    } finally { setTranslatingId(null); }
   }, [language, translateCache]);
 
   const translateDocument = useCallback(async () => {
@@ -195,7 +196,9 @@ export default function HomePage() {
           setTranslateCache(prev => ({ ...prev, [cacheKey]: res.translated }));
         }
       }
-    } catch 
+    } catch (e) {
+      console.error("Arc translation error", e);
+    }
   }, [language, translateCache]);
 
   async function generateBriefing() {

@@ -45,15 +45,17 @@ export function synthPrompt(query: string, atoms: RoutedAtom[], userPersona: str
     atomBlock,
     "",
     "TASK:",
-    `Select ONLY the facts from the atoms that are directly relevant to a '${userPersona || "General Reader"}'. Discard everything else.`,
-    "Synthesise this filtered relevant data into a single cohesive briefing separated into 3-5 distinct 'Angles of Interest'.",
+    `Use the provided news atoms as a starting point, but you are EXPLICITLY ALLOWED AND ENCOURAGED to use your own extensive industry knowledge to expand on these points. Add substantial extra context, industry-specific advice, and background information specifically for a '${userPersona || "General Reader"}'.`,
+    "Synthesise this combined knowledge into a cohesive, highly detailed briefing separated into at least 5 to 7 distinct 'Angles of Interest'. You MUST generate a minimum of 5 sections.",
     "Name these Angles specifically based on what this precise persona cares about.",
     "If an Angle contains strong comparative data (like percentage distributions, market share, or allocations), build a 'chart' object.",
     "",
     "CONSOLIDATION RULES:",
-    `- EXTREME PERSONA FOCUS: If the user indicates a focus (e.g., 'macro policy' or 'tech sector'), ONLY include data about that focus. If an atom discusses unrelated topics, IGNORE them.`,
+    `- DEEP DOMAIN SPECIALIZATION: You MUST mention specific, highly-specialized sub-domains, technical skills, or niches relevant to the persona (e.g., for Electrical Engineering, explicitly mention VLSI, Embedded Systems, Renewable Energy, Smart Grids, or Power Electronics) that they should focus on. Do not give generic advice.`,
+    `- EXTREME PERSONA FOCUS: The briefing must be heavily tailored to the user's role. Provide extra insights directly from your own knowledge base to flesh out the summary and the specific domain relevance.`,
+    `- CONNECT THE DOTS: If the retrieved news atoms describe general trends (like AI, E-commerce, or macroeconomic growth), you MUST explicitly infer, extrapolate, and explain how these general trends directly impact the specific persona (e.g., how AI affects Electrical Engineering jobs). Bridge the gap between general news and their specific field.`,
     "- NO CONTENT DUPLICATION: Each explicit angle MUST address distinct facts. A flat summary or simple aggregation scores low. The test is whether distinct user questions get distinct, non-overlapping answers.",
-    "- PERSONALISED FEED: Adapt depth, vocabulary, and actionable framing directly to the user role. (e.g., a CFO gets macro figures and policy timelines; a young retail investor gets direct stock/momentum advice in relatable language).",
+    "- PERSONALISED FEED: Adapt depth, vocabulary, and actionable framing directly to the user role. (e.g., mention specific tools, softwares, or technical methods).",
     "- MERGE REDUNDANCY: If multiple news atoms lead to the same insight within an angle, merge them. Do not repeat facts across sections.",
     "- BE CONCISE: Minimal words, maximum signal.",
     "",
@@ -65,12 +67,12 @@ export function synthPrompt(query: string, atoms: RoutedAtom[], userPersona: str
     '  "generatedAt": "ISO date string",',
     '  "personal": "A single, powerful, global inference summarizing what this entire briefing means specifically for the user / ' + (userPersona || "General Reader") + '",',
     '  "actionPlan": {',
-    '    "impact": "Deep insight into exactly what affects the user from the news.",',
-    '    "preparation": ["How the user should strictly prepare", "Tactical action step"]',
+    '    "impact": "Deep insight into exactly what affects the user from the news. MUST name specific specialized sub-domains/tools relevant to their persona.",',
+    '    "preparation": ["How the user should strictly prepare (name specific skills)", "Tactical action step (e.g. learn a specific tool or focus on a specific niche)"]',
     '  },',
     '  "sections": [',
     '    {',
-    '      "title": "Angle Name",',
+    '      "title": "Angle Name (e.g., Core Sub-domains to Master)",',
     '      "summary": "High-impact angle summary",',
     '      "points": ["Point 1", "Point 2", "Point 3"],',
     '      "chart": {',
@@ -163,12 +165,13 @@ export async function POST(req: Request) {
     );
   }
 
-  const localRouted = routeAtoms(query, atoms, topK);
+  const combinedQuery = userPersona ? `${query} affecting ${userPersona}` : query;
+  const localRouted = routeAtoms(combinedQuery, atoms, topK);
 
   let remoteAtoms: RoutedAtom[] = [];
   try {
     const { searchWeb } = await import("@/lib/search");
-    const results = await searchWeb(query, 5);
+    const results = await searchWeb(combinedQuery, 6);
     remoteAtoms = results.map((r, i) => ({
       atom_id: `remote-${i}`,
       text: `${r.title}. ${r.snippet}`,
@@ -214,7 +217,7 @@ export async function POST(req: Request) {
     doc = await generateJSON<BriefingDoc>({
       system,
       prompt,
-      temperature: 0.1,
+      temperature: 0.7,
       maxTokens: 1800,
     });
   } catch (e) {
