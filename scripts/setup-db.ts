@@ -7,7 +7,6 @@ async function setup() {
   try {
     await client.query("BEGIN");
 
-    // Atoms table
     await client.query(`
       CREATE TABLE IF NOT EXISTS atoms (
         atom_id TEXT PRIMARY KEY,
@@ -22,7 +21,6 @@ async function setup() {
       );
     `);
 
-    // Conflicts table
     await client.query(`
       CREATE TABLE IF NOT EXISTS conflicts (
         conflict_id TEXT PRIMARY KEY,
@@ -35,7 +33,6 @@ async function setup() {
       );
     `);
 
-    // Social Posts table
     await client.query(`
       CREATE TABLE IF NOT EXISTS social_posts (
         post_id TEXT PRIMARY KEY,
@@ -47,7 +44,6 @@ async function setup() {
       );
     `);
 
-    // Agent Logs table
     await client.query(`
       CREATE TABLE IF NOT EXISTS agent_logs (
         id SERIAL PRIMARY KEY,

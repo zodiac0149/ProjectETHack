@@ -9,13 +9,11 @@ from markdownify import markdownify as mdify
 from ingestion.models import Article
 from ingestion.utils import strip_markdown_noise, utcnow
 
-
 def _guess_source(url: str) -> str | None:
     host = urlparse(url).netloc.lower()
     if host.startswith("www."):
         host = host[4:]
     return host or None
-
 
 def _extract_main_html(html: str) -> tuple[str | None, str]:
     soup = BeautifulSoup(html, "lxml")
@@ -24,19 +22,16 @@ def _extract_main_html(html: str) -> tuple[str | None, str]:
     if soup.title and soup.title.string:
         title = soup.title.string.strip()
 
-    # Prefer <article>, fallback to <main>, else full body.
     node = soup.find("article") or soup.find("main") or soup.body
     if node is None:
         return title, ""
 
-    # Remove obvious non-content sections.
     for tag in node.find_all(["script", "style", "noscript", "iframe", "svg"]):
         tag.decompose()
     for tag in node.find_all(["nav", "header", "footer", "aside"]):
         tag.decompose()
 
     return title, str(node)
-
 
 def fetch_article_markdown(url: str, timeout_s: float = 30.0) -> Article:
     headers = {

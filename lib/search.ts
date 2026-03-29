@@ -8,8 +8,6 @@ export type SearchResult = {
   publishedAt?: string;
 };
 
-// ── Individual fetchers ────────────────────────────────────
-
 async function fetchTavily(query: string, max: number): Promise<SearchResult[]> {
   if (!process.env.TAVILY_API_KEY) return [];
   try {
@@ -74,8 +72,6 @@ async function fetchNewsApi(query: string, max: number): Promise<SearchResult[]>
   } catch { return []; }
 }
 
-// ── Cross-validation & dedup ───────────────────────────────
-
 function normalise(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
 }
@@ -96,14 +92,9 @@ function relevanceScore(keywords: Set<string>, text: string): number {
   return keywords.size > 0 ? hits / keywords.size : 0;
 }
 
-/**
- * Unified search: runs all 3 APIs in parallel, cross-validates,
- * deduplicates by URL, and filters out irrelevant results.
- */
 export async function searchWeb(query: string, maxResults = 5): Promise<SearchResult[]> {
-  const perApi = maxResults + 3; // fetch extra to have room after filtering
+  const perApi = maxResults + 3; 
 
-  // Fire all 3 simultaneously
   const [tavily, serper, newsapi] = await Promise.all([
     fetchTavily(query, perApi),
     fetchSerper(query, perApi),
@@ -112,14 +103,12 @@ export async function searchWeb(query: string, maxResults = 5): Promise<SearchRe
 
   console.log(`[Search] Raw results — Tavily: ${tavily.length}, Serper: ${serper.length}, NewsAPI: ${newsapi.length}`);
 
-  // Merge all results
   const all = [
     ...tavily.map(r => ({ ...r, _from: "tavily" })),
     ...serper.map(r => ({ ...r, _from: "serper" })),
     ...newsapi.map(r => ({ ...r, _from: "newsapi" })),
   ];
 
-  // Deduplicate by URL (keep first seen)
   const seen = new Set<string>();
   const unique: (SearchResult & { _from: string })[] = [];
   for (const r of all) {
@@ -129,20 +118,16 @@ export async function searchWeb(query: string, maxResults = 5): Promise<SearchRe
     unique.push(r);
   }
 
-  // Score each result for relevance to the query
   const queryKw = extractKeywords(query);
   const scored = unique.map(r => ({
     ...r,
     _score: relevanceScore(queryKw, `${r.title} ${r.snippet}`),
   }));
 
-  // Sort by relevance (highest first)
   scored.sort((a, b) => b._score - a._score);
 
-  // Filter: keep results with at least 20% keyword overlap
   const filtered = scored.filter(r => r._score >= 0.2 || r._from === "tavily-ai");
 
-  // Take top N
   const final = filtered.slice(0, maxResults).map(({ _from, _score, ...rest }) => rest);
 
   console.log(`[Search] After cross-validation: ${final.length} results (from ${unique.length} unique, ${all.length} total)`);

@@ -24,7 +24,6 @@ export async function generateSocialPost(
   });
   const post_id = crypto.createHash("md5").update(content).digest("hex").slice(0, 12);
 
-  // Auto-verify
   const verification = await verifyPost(content, atoms);
 
   return {

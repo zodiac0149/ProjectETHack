@@ -61,7 +61,7 @@ function chunkSentences(sents: string[], n = 3): string[] {
 }
 
 export async function buildUserInterestQueries(userId: string): Promise<string[]> {
-  // Start with preference memories if available.
+  
   const base: string[] = [];
   const prefs = userId ? await getPersonaAdjustments(userId) : "";
   if (prefs) base.push(prefs);
@@ -77,7 +77,7 @@ export async function buildUserInterestQueries(userId: string): Promise<string[]
       });
       memories = res.memories.map((m) => m.memory).filter(Boolean);
     } catch {
-      // ignore
+      
     }
   }
 
@@ -93,11 +93,9 @@ export async function buildUserInterestQueries(userId: string): Promise<string[]
   if (/(ltcg|capital gains)/.test(lower)) add("LTCG capital gains tax equities India");
   if (/(nifty|sensex)/.test(lower)) add("Nifty Sensex market reaction India budget");
 
-  // Always keep a couple of broad fallbacks.
   topics.push("Union Budget India market impact");
   topics.push("India taxation changes investors");
 
-  // De-dupe
   return Array.from(new Set(topics)).slice(0, 8);
 }
 
@@ -158,12 +156,11 @@ export async function backgroundFetchAndIngest(args: {
   const started = Date.now();
   const queries = await buildUserInterestQueries(args.userId);
 
-  // Step 1: fetch headlines from ET + reliable sources
   const [et, rel] = await Promise.all([fetchEtHeadlines(), fetchReliableHeadlines()]);
 
   let newsApiArticles: Headline[] = [];
   try {
-    // Dormant until NEWSAPI_KEY is set
+    
     const q = queries[0] || "India markets";
     const na = await searchNewsApi(q, 10);
     newsApiArticles = na.map((a) => ({
@@ -174,7 +171,7 @@ export async function backgroundFetchAndIngest(args: {
       description: a.description,
     }));
   } catch {
-    // ignore
+    
   }
 
   const headlines: Headline[] = [
@@ -185,7 +182,6 @@ export async function backgroundFetchAndIngest(args: {
     .filter((h) => h.title && h.url)
     .slice(0, 250);
 
-  // Step 2: rank headlines against user queries
   const scored = headlines.map((h) => ({
     ...h,
     s: Math.max(...queries.map((q) => score(q, h.title))),
@@ -196,11 +192,10 @@ export async function backgroundFetchAndIngest(args: {
   const picked = scored.slice(0, maxH).filter((h) => h.s > 0 || pickedFallbackAllowed(h));
 
   function pickedFallbackAllowed(h: { source?: string }) {
-    // Always allow a small number of ET items even if score is 0, for freshness
+    
     return Boolean(h.source?.startsWith("ET:"));
   }
 
-  // Step 3: fetch + extract articles (best-effort, sequential to be polite)
   const createdAt = new Date().toISOString();
   const allAtoms: Atom[] = [];
   let fetchedArticles = 0;
@@ -218,7 +213,7 @@ export async function backgroundFetchAndIngest(args: {
       allAtoms.push(...atoms);
       fetchedArticles++;
     } catch {
-      // skip failures (paywalls / blocks / timeouts)
+      
     }
   }
 

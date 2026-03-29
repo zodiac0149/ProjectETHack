@@ -7,7 +7,7 @@ export async function generateJSON<T>(args: {
   maxTokens?: number;
 }): Promise<T> {
   const isSmall = (args.maxTokens || 1600) <= 400;
-  // Large/Normal: Groq prioritized. Small: Gemini/Anthropic try first, fallback to Groq.
+  
   const providers = isSmall
     ? ["gemini", "anthropic", "groq"]
     : ["groq", "gemini", "anthropic"];
@@ -91,11 +91,11 @@ export async function generateJSON<T>(args: {
           return JSON.parse(text.trim()) as T;
         } catch (e: any) {
           console.error(`[LLM] Groq (${model}) failed: ${e.message || e}`);
-          // If it's a rate limit or quota error, try the fallback model immediately
+          
           continue;
         }
       }
-      continue; // Move to next provider if all Groq models fail
+      continue; 
     }
   }
 

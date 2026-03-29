@@ -52,7 +52,7 @@ export async function logAgentEvent(args: {
       ]
     );
   } catch (e) {
-    // Silently skip if DB is unavailable
+    
   }
 }
 

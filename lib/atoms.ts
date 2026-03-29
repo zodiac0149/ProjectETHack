@@ -8,7 +8,7 @@ export function atomsPath(): string {
 }
 
 export async function loadAtoms(limit = 5000): Promise<Atom[]> {
-  // Try DB first if configured
+  
   if (process.env.DATABASE_URL) {
     try {
       const res = await pool.query(
@@ -20,8 +20,7 @@ export async function loadAtoms(limit = 5000): Promise<Atom[]> {
         created_at: r.created_at.toISOString(),
       })) as Atom[];
     } catch (e) {
-      // Offline or ECONNREFUSED is expected if no local Postgres is running.
-      // We fall back silently to JSONL.
+
     }
   }
 
@@ -36,7 +35,7 @@ export async function loadAtoms(limit = 5000): Promise<Atom[]> {
       atoms.push(JSON.parse(t) as Atom);
       if (atoms.length >= limit) break;
     } catch {
-      // ignore
+      
     }
   }
   return atoms;
@@ -46,7 +45,6 @@ export async function saveAtoms(newAtoms: Atom[]): Promise<{ appended: number; p
   const p = atomsPath();
   fs.mkdirSync(path.dirname(p), { recursive: true });
 
-  // 1. Sync to Database if available
   let dbAppended = 0;
   if (process.env.DATABASE_URL) {
     try {
@@ -60,11 +58,10 @@ export async function saveAtoms(newAtoms: Atom[]): Promise<{ appended: number; p
         dbAppended++;
       }
     } catch (e) {
-      // Ignore DB save errors in fallback mode
+      
     }
   }
 
-  // 2. Sync to JSONL for local consistency/backup
   const seen = new Set<string>();
   if (fs.existsSync(p)) {
     const raw = fs.readFileSync(p, "utf-8");
@@ -150,8 +147,8 @@ export function routeAtoms(query: string, atoms: Atom[], topK = 28): RoutedAtom[
   const seen = new Set<string>();
   const out: RoutedAtom[] = [];
   for (const a of scored) {
-    // Skip atoms with negligible relevance to the query
-    if (a.routeScore < 0.15) break;  // sorted desc, so all remaining are worse
+    
+    if (a.routeScore < 0.15) break;  
     const key = a.text.trim().toLowerCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);

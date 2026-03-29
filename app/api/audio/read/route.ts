@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY!;
-// Josh — natural, deep English/Multilingual voice
+
 const VOICE_ID = "TxGEqnHW4m3z4H957B7m";
 
 export async function POST(req: Request) {
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
           Accept: "audio/mpeg",
         },
         body: JSON.stringify({
-          text: text.slice(0, 2500), // ElevenLabs free tier limit
+          text: text.slice(0, 2500), 
           model_id: "eleven_multilingual_v2",
           voice_settings: {
             stability: 0.5,

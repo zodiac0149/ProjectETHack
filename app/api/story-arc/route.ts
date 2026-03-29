@@ -13,10 +13,10 @@ type InputSection = {
 type ArcPoint = {
   id: string;
   title: string;
-  sentiment: number; // -2 to +2
-  label: string;     // e.g. "Bullish", "Cautious", "Bearish", "Neutral"
+  sentiment: number; 
+  label: string;     
   emoji: string;
-  summary: string;   // 1-sentence
+  summary: string;   
 };
 
 type StoryArcResult = {

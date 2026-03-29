@@ -17,7 +17,7 @@ export function hasDatabase(): boolean {
 export async function ensureSchema() {
   if (!hasDatabase()) return;
   try {
-    // Simple check/create for agent_logs table
+    
     await query(`
       CREATE TABLE IF NOT EXISTS agent_logs (
         id SERIAL PRIMARY KEY,
@@ -35,7 +35,7 @@ export async function ensureSchema() {
       );
     `);
   } catch (e) {
-    // Silently skip if DB is unavailable
+    
   }
 }
 
@@ -43,6 +43,6 @@ export async function query<T = any>(text: string, params?: any[]) {
   const start = Date.now();
   const res = await pool.query(text, params);
   const duration = Date.now() - start;
-  // console.log("executed query", { text, duration, rows: res.rowCount });
+  
   return res;
 }

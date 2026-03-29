@@ -20,7 +20,6 @@ def generate_social_post(
     if not groq_key:
         raise ValueError("GROQ_API_KEY not found in environment.")
 
-    # Prepare context
     context = "\n---\n".join([f"Atom {a.atom_id}: {a.text}" for a in atoms])
     
     system = (
@@ -56,11 +55,9 @@ def generate_social_post(
         data = r.json()
     
     post_content = data["choices"][0]["message"]["content"].strip()
-    
-    # Run verification immediately
+
     verification = verify_post_against_atoms(post_content, atoms)
-    
-    # Generate a stable ID (mocking stable_id for now as I don't want to import utils yet if not needed)
+
     import hashlib
     post_id = hashlib.md5(post_content.encode()).hexdigest()[:12]
     

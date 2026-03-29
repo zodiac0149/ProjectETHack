@@ -8,7 +8,6 @@ import httpx
 
 from ingestion.models import AtomTags
 
-
 class GroqTagger:
     def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
@@ -54,10 +53,9 @@ class GroqTagger:
             data = r.json()
 
         content = data["choices"][0]["message"]["content"]
-        # Be forgiving if the model wraps JSON in whitespace/newlines.
+        
         obj = json.loads(content.strip())
         return AtomTags(**obj)
-
 
 def llm_contradiction(
     api_key: str,

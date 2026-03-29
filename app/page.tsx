@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useCallback } from "react";
 
-// ── Types ─────────────────────────────────────────────────────
 type ChartData = { title: string; data: { label: string; value: number; unit?: string }[]; };
 type ActionPlan = { impact: string; preparation: string[]; };
 type BriefingSection = {
@@ -28,7 +27,6 @@ type ViewMode = "grid" | "layers" | "facts";
 
 const LANG_LABELS: Record<Language, string> = { en: "🇬🇧 English", hi: "🇮🇳 Hindi", ta: "🇮🇳 Tamil", bn: "🇮🇳 Bengali" };
 
-// ── Helpers ────────────────────────────────────────────────────
 function normalizeBriefing(raw: BriefingDoc): BriefingDoc {
   return {
     ...raw,
@@ -58,21 +56,18 @@ function sentimentColor(s: number) {
 }
 function sentimentPct(s: number) { return `${((s + 2) / 4) * 100}%`; }
 
-// ── Component ──────────────────────────────────────────────────
 export default function HomePage() {
-  // Setup state
+  
   const [userPersona, setUserPersona] = useState("");
   const [query, setQuery] = useState("");
   const [articleUrl, setArticleUrl] = useState("");
   const [language, setLanguage] = useState<Language>("en");
 
-  // Data
   const [doc, setDoc] = useState<BriefingDoc | null>(null);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [criticIssues, setCriticIssues] = useState<string[] | null>(null);
   const [arc, setArc] = useState<StoryArc | null>(null);
 
-  // Loading
   const [loading, setLoading] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
@@ -81,11 +76,9 @@ export default function HomePage() {
   const [translatingId, setTranslatingId] = useState<string | null>(null);
   const [isTranslatingAll, setIsTranslatingAll] = useState(false);
 
-  // Errors & messages
   const [error, setError] = useState<string | null>(null);
   const [ingestMsg, setIngestMsg] = useState<string | null>(null);
 
-  // UI state
   const [activePane, setActivePane] = useState<"briefing" | "arc">("briefing");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [followUpQ, setFollowUpQ] = useState("");
@@ -135,8 +128,7 @@ export default function HomePage() {
         const res = await postJSON<{ translated: string }>("/api/translate", { text, targetLanguage: language });
         setTranslateCache(prev => ({ ...prev, [cacheKey]: res.translated }));
       }
-      
-      // Translate array of points
+
       if (section.points && Array.isArray(section.points)) {
         for (let i = 0; i < section.points.length; i++) {
           const pt = section.points[i];
@@ -146,7 +138,7 @@ export default function HomePage() {
           setTranslateCache(prev => ({ ...prev, [cacheKey]: res.translated }));
         }
       }
-    } catch { /* silent */ }
+    } catch 
     finally { setTranslatingId(null); }
   }, [language, translateCache]);
 
@@ -183,7 +175,7 @@ export default function HomePage() {
   const translateArc = useCallback(async (arcData: StoryArc) => {
     if (language === "en") return;
     try {
-      // Translate narrative
+      
       if (arcData.narrativeSummary) {
         const text = arcData.narrativeSummary;
         const cacheKey = `${language}:arc:narrative`;
@@ -192,7 +184,7 @@ export default function HomePage() {
           setTranslateCache(prev => ({ ...prev, [cacheKey]: res.translated }));
         }
       }
-      // Translate each point
+      
       for (const pt of arcData.arc) {
         for (const key of ["title", "label", "summary"] as const) {
           const text = pt[key];
@@ -203,10 +195,9 @@ export default function HomePage() {
           setTranslateCache(prev => ({ ...prev, [cacheKey]: res.translated }));
         }
       }
-    } catch { /* silent */ }
+    } catch 
   }, [language, translateCache]);
 
-  // ── Actions ────────────────────────────────────────────────
   async function generateBriefing() {
     setLoading(true); setError(null); setDoc(null);
     setActiveSectionId(null); setCriticIssues(null);
@@ -249,13 +240,12 @@ export default function HomePage() {
     try {
       const resp = await fetch("/api/audio/read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
       if (!resp.ok) {
-        // ElevenLabs failed — fall back to browser speech synthesis
+        
         console.warn("ElevenLabs unavailable, using browser TTS");
         const utter = new SpeechSynthesisUtterance(text.slice(0, 1000));
         utter.rate = 1.0; 
         utter.pitch = 1;
-        
-        // Map language to browser locale
+
         const langMap: Record<string, string> = { hi: "hi-IN", ta: "ta-IN", bn: "bn-IN", en: "en-US" };
         utter.lang = langMap[language] || "en-US";
         
@@ -266,7 +256,7 @@ export default function HomePage() {
       const blob = await resp.blob();
       const audio = new Audio(URL.createObjectURL(blob));
       await audio.play().catch(() => {
-        // Autoplay blocked — try speech synthesis
+        
         const utter = new SpeechSynthesisUtterance(text.slice(0, 1000));
         const langMap: Record<string, string> = { hi: "hi-IN", ta: "ta-IN", bn: "bn-IN", en: "en-US" };
         utter.lang = langMap[language] || "en-US";
@@ -277,7 +267,6 @@ export default function HomePage() {
     }
     finally { setAudioLoading(null); }
   }
-
 
   async function askFollowUp() {
     if (!followUpQ.trim() || !activeSection) return;
@@ -314,7 +303,6 @@ export default function HomePage() {
     if (section && language !== "en") translateSection(section);
   }
 
-  // ── Render helpers ────────────────────────────────────────
   function renderChart(chart?: ChartData) {
     if (!chart || !chart.data || chart.data.length === 0) return null;
     const maxVal = Math.max(...chart.data.map(d => d.value));
@@ -356,11 +344,9 @@ export default function HomePage() {
     );
   }
 
-  // ── JSX ────────────────────────────────────────────────────
   return (
     <div className="app-shell">
 
-      {/* ══ TOP BAR ══════════════════════════════════════════ */}
       <header className="app-topbar">
         <div className="brand-wrap">
           <div className="brand-icon">📰</div>
@@ -410,10 +396,8 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ══ SIDEBAR ══════════════════════════════════════════ */}
       <aside className="app-sidebar">
 
-        {/* Profile */}
         <div className="sidebar-section" style={{ paddingTop: "20px" }}>
           <div className="sidebar-label">Your Profile</div>
           <div className="sb-field">
@@ -438,7 +422,6 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* Library */}
         <div className="sidebar-section" style={{ paddingTop: "18px" }}>
           <div className="sidebar-label">Expand Library</div>
           <div className="sb-field">
@@ -451,7 +434,6 @@ export default function HomePage() {
           {ingestMsg && <p style={{ marginTop: "8px", fontSize: "11.5px", color: "#34d399", lineHeight: "1.5" }}>{ingestMsg}</p>}
         </div>
 
-        {/* Sections */}
         {doc && (
           <div className="sidebar-section" style={{ paddingTop: "18px", flex: 1 }}>
             <div className="sidebar-label">Sections</div>
@@ -475,10 +457,8 @@ export default function HomePage() {
         </div>
       </aside>
 
-      {/* ══ MAIN ══════════════════════════════════════════════ */}
       <main className="app-main">
 
-        {/* ── Analyst warning banner — sits above sticky page-header ── */}
         {criticIssues && !warnDismissed && (
           <div style={{
             background: "#fffbeb", borderBottom: "1px solid #fde68a",
@@ -516,7 +496,6 @@ export default function HomePage() {
             </div>
             <div className="header-actions">
 
-              {/* Audio */}
               <button
                 className="btn btn-green btn-sm"
                 onClick={() => {
@@ -547,13 +526,11 @@ export default function HomePage() {
 
         <div className="main-body">
 
-          {/* Errors */}
           {error && <div className="alert alert-error anim-in" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <span>⚠️ {error}</span>
             <button onClick={() => setError(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", opacity: 0.6, flexShrink: 0 }}>✕</button>
           </div>}
 
-          {/* ── Empty / Loading ── */}
           {!doc && !loading && (
             <div className="empty-state anim-in">
               <div className="empty-icon">📡</div>
@@ -570,7 +547,6 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* ── BRIEFING PANE ── */}
           {doc && !loading && activePane === "briefing" && (
             <div className="anim-in document-container">
               {doc.sections.map((section, secIdx) => (
@@ -578,8 +554,7 @@ export default function HomePage() {
                   <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#111827", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ color: "#3b82f6", opacity: 0.8 }}>#</span> {section.title}
                   </h2>
-                  
-                  {/* Executive Summary for this Angle */}
+
                   {section.summary && (
                     <div className="card card-pad" style={{ marginBottom: "20px", borderLeft: "4px solid #3b82f6", background: "#f8faff" }}>
                       <div style={{ fontSize: "10px", fontWeight: 800, color: "#3b82f6", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>📋 Angle Summary</div>
@@ -589,15 +564,12 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* Native CSS Chart Visualization */}
                   {renderChart(section.chart)}
 
-                  {/* Analysis Output points */}
                   {renderCareerPoints(section)}
                 </div>
               ))}
 
-              {/* Global Synthesis & Action Plan */}
               {(doc.personal || doc.actionPlan) && (
                 <div className="global-personal-box" style={{ background: "linear-gradient(135deg, #fffbeb, #fef3c7)", border: "1px solid #fde68a", padding: "24px", borderRadius: "12px", marginBottom: "40px", boxShadow: "0 4px 20px rgba(217, 119, 6, 0.08)" }}>
                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
@@ -616,8 +588,7 @@ export default function HomePage() {
                          <span style={{ fontSize: "18px" }}>⚡</span>
                          <h4 style={{ fontSize: "14px", fontWeight: 800, color: "#92400e", letterSpacing: "0.05em", textTransform: "uppercase", margin: 0 }}>Strategic Action Plan</h4>
                        </div>
-                       
-                       {/* Impact Analysis */}
+
                        {doc.actionPlan.impact && (
                          <div style={{ marginBottom: "20px" }}>
                            <div style={{ fontSize: "11px", fontWeight: 800, color: "#b45309", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "6px" }}>How This Affects You</div>
@@ -625,7 +596,6 @@ export default function HomePage() {
                          </div>
                        )}
 
-                       {/* Preparation Steps */}
                        {doc.actionPlan.preparation && doc.actionPlan.preparation.length > 0 && (
                          <div>
                            <div style={{ fontSize: "11px", fontWeight: 800, color: "#b45309", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "8px" }}>How To Prepare & Act</div>
@@ -644,7 +614,6 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* Follow-up Q&A at the bottom of the document */}
               <div className="followup-module" style={{ marginTop: "24px" }}>
                 <div className="followup-header">
                   <span>💬</span> Ask a Follow-up Question about this Briefing
@@ -683,7 +652,6 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* ── STORY ARC PANE ── */}
           {doc && !loading && activePane === "arc" && (
             <div className="anim-in">
               {arcLoading && (

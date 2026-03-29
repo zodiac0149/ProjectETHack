@@ -8,10 +8,8 @@ from ingestion.models import Atom, Conflict
 from ingestion.tagging import llm_contradiction
 from ingestion.utils import stable_id
 
-
 _BULL = re.compile(r"\b(rise|rally|surge|gain|bullish|boost|upside|optimis|positive)\b", re.I)
 _BEAR = re.compile(r"\b(fall|dip|decline|drop|bearish|downside|cautious|concern|negative|risk)\b", re.I)
-
 
 def _keyword_polarity(text: str) -> str:
     bull = len(_BULL.findall(text))
@@ -21,7 +19,6 @@ def _keyword_polarity(text: str) -> str:
     if bear > bull and bear >= 1:
         return "Bearish"
     return "Neutral"
-
 
 def detect_conflicts(
     atoms: list[Atom],
@@ -45,10 +42,9 @@ def detect_conflicts(
     llm_enabled = bool(use_llm and groq_key)
 
     for (sector, ent), items in buckets.items():
-        # Sort stable-ish: by url then idx
+        
         items = sorted(items, key=lambda x: (x.url, x.idx))
 
-        # Generate candidate opposing pairs using tags sentiment first; fallback to keyword polarity.
         pairs_checked = 0
         for i in range(len(items)):
             for j in range(i + 1, len(items)):
@@ -96,7 +92,7 @@ def detect_conflicts(
                                 )
                             )
                 else:
-                    # Lightweight market example: "rise" vs "cautious" keyword opposition.
+                    
                     pol_a = _keyword_polarity(a.text)
                     pol_b = _keyword_polarity(b.text)
                     if {pol_a, pol_b} == {"Bullish", "Bearish"}:
@@ -116,7 +112,6 @@ def detect_conflicts(
             if pairs_checked >= max_pairs_per_bucket:
                 break
 
-    # De-duplicate by conflict_id
     uniq: dict[str, Conflict] = {c.conflict_id: c for c in conflicts}
     return list(uniq.values())
 

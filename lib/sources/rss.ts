@@ -18,7 +18,6 @@ export async function fetchRss(url: string): Promise<RssItem[]> {
   if (!res.ok) throw new Error(`RSS fetch failed (${res.status}) for ${url}`);
   const xml = await res.text();
 
-  // Cheerio can parse XML in xmlMode.
   const $ = load(xml, { xmlMode: true });
   const out: RssItem[] = [];
   $("item").each((_, el) => {

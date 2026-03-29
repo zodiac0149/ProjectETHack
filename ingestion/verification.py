@@ -20,7 +20,6 @@ def verify_post_against_atoms(post_content: str, atoms: List[Atom]) -> Verificat
             unsupported_claims=["All claims (system error)"]
         )
 
-    # Prepare historical context from atoms
     context = "\n---\n".join([f"Source [{a.atom_id}]: {a.text}" for a in atoms])
     
     system = (
@@ -58,8 +57,7 @@ def verify_post_against_atoms(post_content: str, atoms: List[Atom]) -> Verificat
         
         content = data["choices"][0]["message"]["content"]
         obj = json.loads(content.strip())
-        
-        # Ensure is_true is based on score threshold if model is inconsistent
+
         score = float(obj.get("score", 0.0))
         return VerificationResult(
             is_true=bool(obj.get("is_true", score > 0.7)),

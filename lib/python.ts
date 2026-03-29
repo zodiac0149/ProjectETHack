@@ -5,7 +5,7 @@ const execAsync = promisify(exec);
 
 export async function runPython(moduleName: string, args: string[]): Promise<any> {
   const pythonPath = process.env.PYTHON_PATH || "python";
-  // Escape arguments for shell (basic)
+  
   const escapedArgs = args.map(arg => `"${arg.replace(/"/g, '\\"')}"`).join(" ");
   const command = `${pythonPath} -m ${moduleName} ${escapedArgs}`;
   

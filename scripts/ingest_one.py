@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Add project root to sys.path
 sys.path.append(os.getcwd())
 
 from ingestion.scrape import fetch_article_markdown
@@ -14,14 +13,11 @@ from ingestion.utils import ensure_dir, write_jsonl
 
 def ingest_one(url: str):
     load_dotenv()
-    
-    # 1. Fetch
+
     art = fetch_article_markdown(url)
-    
-    # 2. Atomize
+
     atoms = _atomize(url, art.title, art.markdown)
-    
-    # 3. Tag (Optional but recommended)
+
     if os.getenv("GROQ_API_KEY"):
         tagger = GroqTagger()
         for a in atoms:
@@ -29,13 +25,11 @@ def ingest_one(url: str):
                 a.tags = tagger.tag_atom(a.text)
             except:
                 pass
-                
-    # 4. Append to data/atoms.jsonl
+
     out_dir = Path("data")
     ensure_dir(out_dir)
     atoms_path = out_dir / "atoms.jsonl"
-    
-    # Read existing to avoid duplicates if possible, or just append
+
     existing_ids = set()
     if atoms_path.exists():
         with open(atoms_path, "r", encoding="utf-8") as f:

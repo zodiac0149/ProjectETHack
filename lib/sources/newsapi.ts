@@ -10,10 +10,6 @@ export function hasNewsApi(): boolean {
   return Boolean(process.env.NEWSAPI_KEY);
 }
 
-/**
- * Placeholder "free source" integration.
- * Set NEWSAPI_KEY later and this starts working.
- */
 export async function searchNewsApi(query: string, pageSize = 10): Promise<NewsApiArticle[]> {
   const key = process.env.NEWSAPI_KEY;
   if (!key) return [];

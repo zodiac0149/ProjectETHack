@@ -21,7 +21,6 @@ from ingestion.utils import (
     write_text,
 )
 
-
 def _read_urls(path: Path) -> list[str]:
     if not path.exists():
         raise RuntimeError(f"Missing URL list at {path}")
@@ -32,7 +31,6 @@ def _read_urls(path: Path) -> list[str]:
             continue
         urls.append(t)
     return urls
-
 
 def _atomize(url: str, article_title: str | None, markdown: str) -> list[Atom]:
     sentences = split_sentences(markdown)
@@ -52,7 +50,6 @@ def _atomize(url: str, article_title: str | None, markdown: str) -> list[Atom]:
             )
         )
     return atoms
-
 
 def main() -> int:
     load_dotenv()
@@ -95,7 +92,7 @@ def main() -> int:
             try:
                 a.tags = tagger.tag_atom(a.text)
             except Exception as e:
-                # Keep pipeline moving; tags remain None for this atom.
+                
                 a.tags = None
                 a.sector_hint = "tag_error"
                 a.entity_hint = str(e)[:120]
@@ -121,7 +118,6 @@ def main() -> int:
     )
     print(summary)
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

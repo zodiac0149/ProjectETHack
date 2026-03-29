@@ -165,7 +165,6 @@ export async function POST(req: Request) {
 
   const localRouted = routeAtoms(query, atoms, topK);
 
-  // ── Remote Search ──
   let remoteAtoms: RoutedAtom[] = [];
   try {
     const { searchWeb } = await import("@/lib/search");
@@ -177,7 +176,7 @@ export async function POST(req: Request) {
       idx: 999 + i,
       created_at: new Date().toISOString(),
       score: 1.0, 
-      routeScore: 1.0, // Fix lint error
+      routeScore: 1.0, 
     }));
   } catch (e) {
     console.warn("Synthesis search failed:", e);
@@ -238,7 +237,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Minimal server-side normalization
   const d = doc as BriefingDoc;
   const rawSections = Array.isArray(d.sections) ? d.sections : [];
   const out: BriefingDoc = {
@@ -247,7 +245,7 @@ export async function POST(req: Request) {
     generatedAt: d.generatedAt || new Date().toISOString(),
     sections: rawSections.map((s, i) => ({
       ...s,
-      // Always guarantee a stable id — LLM often omits this field
+      
       id: s.id && s.id !== "undefined"
         ? s.id
         : `sec-${i}-${(s.title || "section").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24)}`,

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-// In-memory session cache
 const cache = new Map<string, string>();
 
 function hashKey(text: string, lang: string): string {
@@ -14,10 +13,6 @@ const GOOGLE_LANG_CODES: Record<string, string> = {
   en: "en",
 };
 
-/**
- * Google Translate free endpoint — no API key needed.
- * Falls back gracefully if blocked.
- */
 async function googleTranslate(text: string, targetLang: string): Promise<string> {
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
 
@@ -25,7 +20,7 @@ async function googleTranslate(text: string, targetLang: string): Promise<string
   if (!res.ok) throw new Error(`Google Translate HTTP ${res.status}`);
 
   const data = await res.json();
-  // Response is nested arrays: [[["translated","original",...],...],...]
+  
   const sentences: string[] = (data[0] || []).map((seg: any) => seg[0] || "");
   return sentences.join("");
 }

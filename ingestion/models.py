@@ -5,7 +5,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 class Article(BaseModel):
     url: str
     fetched_at: datetime
@@ -13,16 +12,13 @@ class Article(BaseModel):
     source: str | None = None
     markdown: str
 
-
 Sector = Literal["IT", "Agriculture", "Real Estate", "Other"]
 Sentiment = Literal["Bullish", "Bearish", "Neutral"]
-
 
 class AtomTags(BaseModel):
     sector: Sector = "Other"
     sentiment: Sentiment = "Neutral"
     entities: list[str] = Field(default_factory=list)
-
 
 class Atom(BaseModel):
     atom_id: str
@@ -32,12 +28,10 @@ class Atom(BaseModel):
     text: str
     created_at: datetime
 
-    # Lightweight retrieval metadata
     sector_hint: str | None = None
     entity_hint: str | None = None
 
     tags: AtomTags | None = None
-
 
 class Conflict(BaseModel):
     conflict_id: str
@@ -48,15 +42,13 @@ class Conflict(BaseModel):
     reason: str
     kind: Literal["sentiment_opposition", "llm_contradiction", "keyword_opposition"]
 
-
 class VerificationResult(BaseModel):
     is_true: bool
-    score: float  # 0 to 1.0
+    score: float  
     reasoning: str
     supported_claims: list[str] = Field(default_factory=list)
     unsupported_claims: list[str] = Field(default_factory=list)
-    conflicting_atoms: list[str] = Field(default_factory=list)  # IDs of atoms that contradict the post
-
+    conflicting_atoms: list[str] = Field(default_factory=list)  
 
 class SocialPost(BaseModel):
     post_id: str

@@ -19,7 +19,7 @@ export type Atom = {
 
 export type VerificationResult = {
   is_true: boolean;
-  score: number; // 0 to 1
+  score: number; 
   reasoning: string;
   supported_claims: string[];
   unsupported_claims: string[];

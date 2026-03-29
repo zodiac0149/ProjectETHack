@@ -100,7 +100,7 @@ export default function MyETPage() {
 
       {out ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* CFO Dashboard */}
+          
           <Card className="bg-gradient-to-b from-white/[0.06] to-white/[0.03]">
             <CardHeader>
               <CardTitle className="flex items-center justify-between gap-2">
@@ -174,7 +174,6 @@ export default function MyETPage() {
             </CardContent>
           </Card>
 
-          {/* 24-year-old Investor Dashboard */}
           <Card className="bg-gradient-to-b from-emerald-300/10 to-white/[0.03]">
             <CardHeader>
               <CardTitle className="flex items-center justify-between gap-2">

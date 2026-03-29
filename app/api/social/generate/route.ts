@@ -14,7 +14,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid platform. Must be Twitter or LinkedIn" }, { status: 400 });
     }
 
-    // Load actual atoms from IDs
     const allAtoms = await loadAtoms(2000);
     const selectedAtoms = allAtoms.filter((a) => sourceAtomIds.includes(a.atom_id));
 
